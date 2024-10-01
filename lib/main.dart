@@ -1,170 +1,146 @@
-
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'dart:async';
 import 'dart:math';
 
-void main() => runApp(RunaMatrixApp());
+void main() => runApp(AyahuascaVisionApp());
 
-class RunaMatrixApp extends StatelessWidget {
+class AyahuascaVisionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Runa Matrix',
-      theme: ThemeData.dark(),
-      home: MatrixScreen(),
+      title: 'Ayahuasca Vision',
+      home: VisionScreen(),
     );
   }
 }
 
-class MatrixScreen extends StatefulWidget {
+class VisionScreen extends StatefulWidget {
   @override
-  _MatrixScreenState createState() => _MatrixScreenState();
+  _VisionScreenState createState() => _VisionScreenState();
 }
 
-class _MatrixScreenState extends State<MatrixScreen> {
+class _VisionScreenState extends State<VisionScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
   final AudioPlayer _audioPlayer = AudioPlayer();
-  List<RuneSymbol> symbols = [];
-  Random random = Random();
-  Timer? _timer;
-  bool _isStarted = false;  // To track if the animation has started
+  double _climbOffset = 0;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _initSymbols();
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: Duration(seconds: 20))
+      ..repeat(); // Infinite animation
+
+    _playMusic();
+    _startClimbing();
+  }
+
+  Future<void> _playMusic() async {
+    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    await _audioPlayer.play(AssetSource('1.mp3')); // Play background music
+  }
+
+  void _startClimbing() {
+    // Simulate floating/climbing by animating upward movement over time
+    _controller.addListener(() {
+      setState(() {
+        _climbOffset = _controller.value * 500; // Adjust climb speed and height
+      });
+    });
   }
 
   @override
   void dispose() {
+    _controller.dispose();
     _audioPlayer.dispose();
-    _timer?.cancel();
     super.dispose();
-  }
-
-  void _initSymbols() {
-    for (int i = 0; i < 150; i++) {
-      symbols.add(RuneSymbol(
-        random.nextDouble() * MediaQuery.of(context).size.width,
-        random.nextDouble() * MediaQuery.of(context).size.height,
-        random.nextDouble() * 0.5 - 0.25,
-        random.nextDouble() * 0.5 - 0.25,
-        _generateRandomColor(),
-      ));
-    }
-  }
-
-  Color _generateRandomColor() {
-    List<Color> gradientColors = [
-      Colors.blue,
-      Colors.purple,
-      Colors.red,
-      Colors.orange,
-    ];
-    return gradientColors[random.nextInt(gradientColors.length)];
-  }
-
-  void _updateSymbols() {
-    setState(() {
-      for (var symbol in symbols) {
-        symbol.x += symbol.dx;
-        symbol.y += symbol.dy;
-
-        if (symbol.x < 0) symbol.x = MediaQuery.of(context).size.width;
-        if (symbol.x > MediaQuery.of(context).size.width) symbol.x = 0;
-        if (symbol.y < 0) symbol.y = MediaQuery.of(context).size.height;
-        if (symbol.y > MediaQuery.of(context).size.height) symbol.y = 0;
-      }
-    });
-  }
-
-  Future<void> _startAudioAndAnimation() async {
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    await _audioPlayer.play(AssetSource('1.mp3'));
-
-    setState(() {
-      _isStarted = true;  // Hide the message after starting
-    });
-
-    _timer = Timer.periodic(Duration(milliseconds: 1000 ~/ 60), (Timer t) {
-      _updateSymbols();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GestureDetector(
-        onTap: _startAudioAndAnimation,
-        child: Container(
-          color: Colors.black,
-          child: CustomPaint(
-            painter: RunaPainter(symbols),
-            child: !_isStarted  // Show message only before animation starts
-                ? Center(
-                    child: Text(
-                      'Tap to start the matrix',
-                      style: TextStyle(color: Colors.white, fontSize: 24),
-                    ),
-                  )
-                : null,
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: VisionPainter(_controller.value, _climbOffset),
+                child: Container(),
+              );
+            },
           ),
-        ),
+          GestureDetector(
+            onTap: _playMusic,  // Restart or play music on tap
+            child: Center(
+              child: Text(
+                'Tap to Start the Vision',
+                style: TextStyle(color: Colors.white, fontSize: 24),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class RunaPainter extends CustomPainter {
-  final List<RuneSymbol> symbols;
-  final random = Random();
+class VisionPainter extends CustomPainter {
+  final double progress;
+  final double climbOffset;
+  VisionPainter(this.progress, this.climbOffset);
 
-  RunaPainter(this.symbols);
+  final Random random = Random();
+  final List<Color> gradientColors = [Colors.blue, Colors.green, Colors.purple, Colors.orange];
 
   @override
   void paint(Canvas canvas, Size size) {
-    final textStyle = TextStyle(fontSize: 20);
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    for (var symbol in symbols) {
-      final textSpan = TextSpan(
-          text: String.fromCharCode(symbol.runeCode),
-          style: textStyle.copyWith(color: symbol.color));
-      textPainter.text = textSpan;
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(symbol.x, symbol.y));
-    }
-
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    for (var i = 0; i < symbols.length - 1; i++) {
-      canvas.drawLine(
-        Offset(symbols[i].x, symbols[i].y),
-        Offset(symbols[i + 1].x, symbols[i + 1].y),
-        paint,
-      );
-    }
-
-    _drawBinaryBackground(canvas, size);
+    _drawBackgroundGradient(canvas, size);
+    _drawFloatingOrbs(canvas, size);
+    _drawGlowingFigures(canvas, size);
   }
 
-  void _drawBinaryBackground(Canvas canvas, Size size) {
-    final binaryTextStyle = TextStyle(color: Colors.white.withOpacity(0.05), fontSize: 12);
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+  void _drawBackgroundGradient(Canvas canvas, Size size) {
+    final gradient = LinearGradient(
+      colors: [
+        gradientColors[random.nextInt(gradientColors.length)],
+        gradientColors[random.nextInt(gradientColors.length)],
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
 
-    for (double i = 0; i < size.width; i += 20) {
-      for (double j = 0; j < size.height; j += 20) {
-        final textSpan = TextSpan(
-            text: random.nextBool() ? '1' : '0',
-            style: binaryTextStyle);
-        textPainter.text = textSpan;
-        textPainter.layout();
-        textPainter.paint(canvas, Offset(i, j));
-      }
+    final rect = Rect.fromLTWH(0, -climbOffset, size.width, size.height + climbOffset);
+    final paint = Paint()..shader = gradient.createShader(rect);
+    canvas.drawRect(rect, paint);
+  }
+
+  void _drawFloatingOrbs(Canvas canvas, Size size) {
+    for (int i = 0; i < 5; i++) {
+      final radius = 30 + 20 * sin(progress * 2 * pi + i); // Pulsating effect
+      final x = size.width * 0.5 + cos(progress * 2 * pi + i) * (i * 40);
+      final y = size.height * 0.5 + sin(progress * 2 * pi + i) * (i * 40) - climbOffset;
+
+      final orbPaint = Paint()
+        ..color = Colors.white.withOpacity(0.5)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius / 2); // Glow effect
+
+      canvas.drawCircle(Offset(x, y), radius, orbPaint);
+    }
+  }
+
+  void _drawGlowingFigures(Canvas canvas, Size size) {
+    for (int i = 0; i < 3; i++) {
+      final glowRadius = 50 + 10 * sin(progress * 2 * pi + i); // Expanding glow effect
+      final x = size.width * 0.4 + (i * 100);
+      final y = size.height * 0.75 - climbOffset; // Move figures up during "climb"
+
+      final glowPaint = Paint()
+        ..color = Colors.yellow.withOpacity(0.5)
+        ..maskFilter = MaskFilter.blur(BlurStyle.outer, glowRadius); // Outer glow effect
+
+      canvas.drawCircle(Offset(x, y), glowRadius, glowPaint);
     }
   }
 
@@ -172,14 +148,4 @@ class RunaPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
   }
-}
-
-class RuneSymbol {
-  double x, y;
-  double dx, dy;
-  Color color;
-  int runeCode;
-
-  RuneSymbol(this.x, this.y, this.dx, this.dy, this.color)
-      : runeCode = 0x16A0 + Random().nextInt(96);
 }
